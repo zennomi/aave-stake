@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "compile": "npx hardhat compile",
+    "script": "npx hardhat run scripts/test-script.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
