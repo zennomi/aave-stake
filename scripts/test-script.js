@@ -32,31 +32,33 @@ async function main() {
   console.log("stkAave deployed to:", stkToken.address);
 
   // tranfer some tokens for vault and user
-  await token.transfer(vault.address, 10000000);
-  await token.transfer(user1.address, 200000);
-  await token.transfer(user2.address, 200000);
+  await token.transfer(vault.address, 100000000);
+  await token.transfer(user1.address, 2000000);
+  await token.transfer(user2.address, 2000000);
 
   // aprove for staked contract
-  await token.connect(vault).approve(stkToken.address, 1000000);
-  await token.connect(user1).approve(stkToken.address, 200000);
-  await token.connect(user2).approve(stkToken.address, 200000);
+  await token.connect(vault).approve(stkToken.address, 10000000);
+  await token.connect(user1).approve(stkToken.address, 2000000);
+  await token.connect(user2).approve(stkToken.address, 2000000);
   
   // config
   await stkToken.configureAssets([{ emissionPerSecond: 1, totalStaked: 0, underlyingAsset: stkToken.address }])
   
   // start staking
-  // stake nhiều tiền không quan trọng? quan trọng là chiếm bao nhiêu %?
-  await stkToken.connect(user1).stake(user1.address, 100000);
-  await stkToken.connect(user2).stake(user2.address, 150000);
-
+  await stkToken.connect(user1).stake(user1.address, 1000000);
+  await stkToken.connect(user2).stake(user2.address, 1500000);
+  
   // fake time
   await ethers.provider.send("evm_increaseTime", [7 * 24 * 3600]);
   await ethers.provider.send('evm_mine');
   //
   // check reward
   console.log(await token.balanceOf(user1.address));
-  console.log(await stkToken.getTotalRewardsBalance(user1.address));
-  await stkToken.connect(user1).claimRewards(user1.address, 1441);
+  const user1Reward1 = await stkToken.getTotalRewardsBalance(user1.address);
+  await stkToken.connect(user2).stake(user2.address, 500000);
+  const user1Reward = await stkToken.getTotalRewardsBalance(user1.address);
+  console.log(user1Reward);
+  await stkToken.connect(user1).claimRewards(user1.address, user1Reward);
   console.log(await token.balanceOf(user1.address));
 }
 
