@@ -43,7 +43,7 @@ contract StakedToken is
     mapping(address => uint256) public stakerRewardsToClaim;
     mapping(address => uint256) public stakersCooldowns;
     mapping(address => uint256) stakersLockEndTimestamp;
-    uint256[] stakeEndTimestamp;
+    uint256[] stakeEndTimestamps;
 
     event Staked(
         address indexed from,
@@ -128,12 +128,12 @@ contract StakedToken is
             address(this),
             amount
         );
-        if (
-            stakeEndTimestamp.length != 0 &&
-            stakeEndTimestamp[stakeEndTimestamp.length - 1] != block.timestamp
-        ) {
-            stakeEndTimestamp.push(block.timestamp);
-        }
+
+        uint256 lockEndTimestamp = block.timestamp + LOCK_SECONDS;
+
+        stakersLockEndTimestamp[msg.sender] = lockEndTimestamp;
+        
+        stakeEndTimestamps.push(lockEndTimestamp);
 
         emit Staked(msg.sender, onBehalfOf, amount);
     }
@@ -296,6 +296,13 @@ contract StakedToken is
         if (block.timestamp == lastUpdateTimestamp) {
             return oldIndex;
         }
+
+        for (uint256 i; i < stakeEndTimestamps.length; i++) {
+          if (stakeEndTimestamps[i] < block.timestamp) {
+            indexAtT
+          }
+        }
+
         uint256 newIndex = _getAssetIndex(
             oldIndex,
             assetConfig.emissionPerSecond,
