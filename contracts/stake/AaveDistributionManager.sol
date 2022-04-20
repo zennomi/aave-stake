@@ -120,7 +120,7 @@ contract AaveDistributionManager is IAaveDistributionManager {
         address asset,
         uint256 stakedByUser,
         uint256 totalStaked
-    ) internal returns (uint256) {
+    ) internal virtual returns (uint256) {
         AssetData storage assetData = assets[asset];
         uint256 userIndex = assetData.users[user];
         uint256 accruedRewards = 0;
@@ -178,7 +178,7 @@ contract AaveDistributionManager is IAaveDistributionManager {
     function _getUnclaimedRewards(
         address user,
         DistributionTypes.UserStakeInput[] memory stakes
-    ) internal view returns (uint256) {
+    ) internal virtual view returns (uint256) {
         uint256 accruedRewards = 0;
 
         for (uint256 i = 0; i < stakes.length; i++) {

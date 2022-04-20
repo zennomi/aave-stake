@@ -32,7 +32,7 @@ contract StakedToken is
     IERC20 public immutable STAKED_TOKEN;
     IERC20 public immutable REWARD_TOKEN;
     uint256 public immutable COOLDOWN_SECONDS;
-    uint256 public immutable LOCK_SECONDS = 7 * 24 * 2600; // LOCK IN 7 DAYS
+    uint256 public immutable LOCK_SECONDS = 7 * 24 * 3600; // LOCK IN 7 DAYS
 
     /// @notice Seconds available to redeem once the cooldown period is fullfilled
     uint256 public immutable UNSTAKE_WINDOW;
@@ -42,7 +42,9 @@ contract StakedToken is
 
     mapping(address => uint256) public stakerRewardsToClaim;
     mapping(address => uint256) public stakersCooldowns;
-    mapping(address => uint256) stakersLockEndTimestamp;
+    mapping(address => uint256) public stakersLockEndTimestamp;
+    mapping(uint256 => uint256) public indexAtTimestamp;
+
     uint256[] stakeEndTimestamps;
 
     event Staked(
@@ -102,6 +104,7 @@ contract StakedToken is
     function stake(address onBehalfOf, uint256 amount) external override {
         require(amount != 0, "INVALID_ZERO_AMOUNT");
         uint256 balanceOfUser = balanceOf(onBehalfOf);
+        require(balanceOfUser == 0, "USER_STAKED");
 
         uint256 accruedRewards = _updateUserAssetInternal(
             onBehalfOf,
@@ -129,10 +132,10 @@ contract StakedToken is
             amount
         );
 
-        uint256 lockEndTimestamp = block.timestamp + LOCK_SECONDS;
+        uint256 lockEndTimestamp = block.timestamp.add(LOCK_SECONDS);
 
         stakersLockEndTimestamp[msg.sender] = lockEndTimestamp;
-        
+
         stakeEndTimestamps.push(lockEndTimestamp);
 
         emit Staked(msg.sender, onBehalfOf, amount);
@@ -298,9 +301,21 @@ contract StakedToken is
         }
 
         for (uint256 i; i < stakeEndTimestamps.length; i++) {
-          if (stakeEndTimestamps[i] < block.timestamp) {
-            indexAtT
-          }
+            if (
+                stakeEndTimestamps[i] <= block.timestamp &&
+                indexAtTimestamp[stakeEndTimestamps[i]] == 0
+            ) {
+                indexAtTimestamp[
+                    stakeEndTimestamps[i]
+                ] = _getAssetIndexWithTimestamp(
+                    oldIndex,
+                    assetConfig.emissionPerSecond,
+                    lastUpdateTimestamp,
+                    totalStaked,
+                    stakeEndTimestamps[i]
+                );
+                if (stakeEndTimestamps[i] > block.timestamp) break;
+            }
         }
 
         uint256 newIndex = _getAssetIndex(
@@ -318,6 +333,70 @@ contract StakedToken is
         assetConfig.lastUpdateTimestamp = uint128(block.timestamp);
 
         return newIndex;
+    }
+
+    function _getAssetIndexWithTimestamp(
+        uint256 currentIndex,
+        uint256 emissionPerSecond,
+        uint128 lastUpdateTimestamp,
+        uint256 totalBalance,
+        uint256 timestamp
+    ) internal view returns (uint256) {
+        if (
+            emissionPerSecond == 0 ||
+            totalBalance == 0 ||
+            lastUpdateTimestamp == timestamp ||
+            lastUpdateTimestamp >= DISTRIBUTION_END
+        ) {
+            return currentIndex;
+        }
+        uint256 currentTimestamp = timestamp > DISTRIBUTION_END
+            ? DISTRIBUTION_END
+            : timestamp;
+        uint256 timeDelta = currentTimestamp.sub(lastUpdateTimestamp);
+        return
+            emissionPerSecond
+                .mul(timeDelta)
+                .mul(10**uint256(PRECISION))
+                .div(totalBalance)
+                .add(currentIndex);
+    }
+
+    function _updateUserAssetInternal(
+        address user,
+        address asset,
+        uint256 stakedByUser,
+        uint256 totalStaked
+    ) internal override returns (uint256) {
+        AssetData storage assetData = assets[asset];
+        uint256 userIndex = assetData.users[user];
+        uint256 accruedRewards = 0;
+
+        uint256 newIndex = _updateAssetStateInternal(
+            asset,
+            assetData,
+            totalStaked
+        );
+        if (
+            stakersLockEndTimestamp[user] != 0 &&
+            stakersLockEndTimestamp[user] <= block.timestamp
+        ) {
+            newIndex = indexAtTimestamp[stakersLockEndTimestamp[user]];
+            console.log(newIndex);
+        } else {
+            newIndex = _updateAssetStateInternal(asset, assetData, totalStaked);
+        }
+
+        if (userIndex != newIndex) {
+            if (stakedByUser != 0) {
+                accruedRewards = _getRewards(stakedByUser, newIndex, userIndex);
+            }
+
+            assetData.users[user] = newIndex;
+            emit UserIndexUpdated(user, asset, newIndex);
+        }
+
+        return accruedRewards;
     }
 
     /**
@@ -381,17 +460,42 @@ contract StakedToken is
         view
         returns (uint256)
     {
-        DistributionTypes.UserStakeInput[]
-            memory userStakeInputs = new DistributionTypes.UserStakeInput[](1);
-        userStakeInputs[0] = DistributionTypes.UserStakeInput({
-            underlyingAsset: address(this),
-            stakedByUser: balanceOf(staker),
-            totalStaked: totalSupply()
-        });
-        return
-            stakerRewardsToClaim[staker].add(
-                _getUnclaimedRewards(staker, userStakeInputs)
+        AssetData storage assetConfig = assets[address(this)];
+        // uint256 assetIndex = _getAssetIndexWithTimestamp(
+        //     assetConfig.index,
+        //     assetConfig.emissionPerSecond,
+        //     assetConfig.lastUpdateTimestamp,
+        //     totalSupply(),
+        //     block.timestamp <= stakersLockEndTimestamp[staker]
+        //         ? block.timestamp
+        //         : stakersLockEndTimestamp[staker]
+        // );
+        uint256 assetIndex;
+        uint256 lockEndTimestamp = stakersLockEndTimestamp[staker];
+        if (block.timestamp > lockEndTimestamp) {
+            if (indexAtTimestamp[lockEndTimestamp] != 0)
+                assetIndex = indexAtTimestamp[lockEndTimestamp];
+            else
+                assetIndex = _getAssetIndexWithTimestamp(
+                    assetConfig.index,
+                    assetConfig.emissionPerSecond,
+                    assetConfig.lastUpdateTimestamp,
+                    totalSupply(),
+                    lockEndTimestamp
+                );
+        } else
+            assetIndex = _getAssetIndex(
+                assetConfig.index,
+                assetConfig.emissionPerSecond,
+                assetConfig.lastUpdateTimestamp,
+                totalSupply()
             );
+        uint256 accruedRewards = _getRewards(
+            balanceOf(staker),
+            assetIndex,
+            assetConfig.users[staker]
+        );
+        return stakerRewardsToClaim[staker].add(accruedRewards);
     }
 
     /**

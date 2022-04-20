@@ -20,7 +20,7 @@ async function main() {
   const token = await TVBToken.deploy();
   await token.deployed();
   console.log("TVB Token (for staking test) deployed to:", token.address);
-  console.log("Total Supply: ", await token.totalSupply());
+  console.log("Total Supply: ", (await token.totalSupply()).toString());
 
   const StakedAave = await hre.ethers.getContractFactory("StakedAave");
   const stkToken = await StakedAave.deploy(token.address, token.address, 10, 10, vault.address, owner.address, 365 * 24 * 60 * 60);
@@ -46,20 +46,39 @@ async function main() {
   
   // start staking
   await stkToken.connect(user1).stake(user1.address, 1000000);
-  await stkToken.connect(user2).stake(user2.address, 1500000);
   
-  // fake time
-  await ethers.provider.send("evm_increaseTime", [7 * 24 * 3600]);
+  let user1Reward;
+  
+  console.log("5 days later...");
+  await ethers.provider.send("evm_increaseTime", [5 * 24 * 3600]);
   await ethers.provider.send('evm_mine');
-  //
-  // check reward
-  console.log(await token.balanceOf(user1.address));
-  const user1Reward1 = await stkToken.getTotalRewardsBalance(user1.address);
-  await stkToken.connect(user2).stake(user2.address, 500000);
-  const user1Reward = await stkToken.getTotalRewardsBalance(user1.address);
-  console.log(user1Reward);
-  await stkToken.connect(user1).claimRewards(user1.address, user1Reward);
-  console.log(await token.balanceOf(user1.address));
+  
+  user1Reward = await stkToken.getTotalRewardsBalance(user1.address);
+  console.log("Reward of User 1: ", user1Reward.toString());
+  
+  console.log("6 days later...");
+  await ethers.provider.send("evm_increaseTime", [1 * 24 * 3600]);
+  await ethers.provider.send('evm_mine');
+  
+  user1Reward = await stkToken.getTotalRewardsBalance(user1.address);
+  console.log("Reward of User 1: ", user1Reward.toString());
+  
+  console.log("7 days later...");
+  await ethers.provider.send("evm_increaseTime", [1 * 24 * 3600]);
+  await ethers.provider.send('evm_mine');
+  
+  user1Reward = await stkToken.getTotalRewardsBalance(user1.address);
+  console.log("Reward of User 1: ", user1Reward.toString());
+  
+  await stkToken.connect(user1).stake(user2.address, 500000);
+  console.log("8 days later...");
+  await ethers.provider.send("evm_increaseTime", [1 * 24 * 3600]);
+  await ethers.provider.send('evm_mine');
+
+  user1Reward = await stkToken.getTotalRewardsBalance(user1.address);
+  console.log("Reward of User 1: ", user1Reward.toString());
+  // await stkToken.connect(user1).claimRewards(user1.address, user1Reward);
+
 }
 
 // We recommend this pattern to be able to use async/await everywhere
