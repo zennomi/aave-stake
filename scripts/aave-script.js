@@ -22,7 +22,7 @@ async function main() {
   console.log("TVB Token (for staking test) deployed to:", token.address);
   console.log("Total Supply: ", (await token.totalSupply()).toString());
 
-  const StakedAave = await hre.ethers.getContractFactory("StakedTVB");
+  const StakedAave = await hre.ethers.getContractFactory("StakedAave");
   const stkToken = await StakedAave.deploy(
     token.address,
     token.address,
@@ -34,7 +34,7 @@ async function main() {
   );
   // staked token is also reward token
   // 10s cooldown seconds
-  // 10s window
+  // 1 day window
 
   await stkToken.deployed();
   console.log("stkAave deployed to:", stkToken.address);
@@ -59,10 +59,7 @@ async function main() {
   // start staking
   await stkToken.connect(user1).stake(user1.address, 500000);
   // await stkToken.connect(user3).stake(user1.address, 500000);
-  console.log(
-    "User1 staking end at ",
-    (await stkToken.getUserLockEndTimestamp(user1.address)).toString()
-  );
+
   let user1Reward;
   let user2Reward;
 
@@ -108,7 +105,7 @@ async function main() {
   user2Reward = await stkToken.getTotalRewardsBalance(user2.address);
   console.log("Reward of User 2: ", user2Reward.toString());
   // await stkToken.connect(user1).claimRewards(user1.address, user1Reward);
-  
+
   console.log("User 1 call cooldown()");
   await stkToken.connect(user1).cooldown();
 

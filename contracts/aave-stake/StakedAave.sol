@@ -10,7 +10,7 @@ import {StakedToken} from './StakedToken.sol';
  * @notice StakedToken with AAVE token as staked token
  * @author Aave
  **/
-contract StakedTVB is StakedToken {
+contract StakedAave is StakedToken {
   string internal constant NAME = 'Staked Aave';
   string internal constant SYMBOL = 'stkAAVE';
   uint8 internal constant DECIMALS = 18;
