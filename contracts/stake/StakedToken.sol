@@ -235,7 +235,6 @@ contract StakedToken is
         uint256 balanceOfFrom = balanceOf(from);
         // Sender
         _updateCurrentUnclaimedRewards(from, balanceOfFrom, true);
-
         // Recipient
         if (from != to) {
             uint256 balanceOfTo = balanceOf(to);
