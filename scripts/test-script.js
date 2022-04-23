@@ -80,7 +80,7 @@ async function main() {
   user1Reward = await stkToken.getTotalRewardsBalance(user1.address);
   console.log("Reward of User 1: ", user1Reward.toString());
 
-  await ethers.provider.send("evm_increaseTime", [1 * 24 * 3600]);
+  await ethers.provider.send("evm_increaseTime", [2 * 24 * 3600]);
   await ethers.provider.send("evm_mine");
   console.log("Next 1 day... Current timestamp is ", (await ethers.provider.getBlock((await ethers.provider.getBlockNumber()))).timestamp);
 

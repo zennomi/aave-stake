@@ -44,8 +44,13 @@ contract StakedToken is
     mapping(address => uint256) public stakersCooldowns;
     mapping(address => uint256) public stakersLockEndTimestamp;
     mapping(uint256 => uint256) public indexAtTimestamp;
+    mapping(uint256 => uint256) public subSupplyAtTimestamp;
 
     uint256[] stakeEndTimestamps;
+    uint256 public currentSupply; // except users whose staking ended
+
+    uint256 private timestampsStartIndex;
+    uint256 private subSupplyStartIndex;
 
     event Staked(
         address indexed from,
@@ -110,7 +115,7 @@ contract StakedToken is
             onBehalfOf,
             address(this),
             balanceOfUser,
-            totalSupply()
+            currentSupply
         );
         if (accruedRewards != 0) {
             emit RewardsAccrued(onBehalfOf, accruedRewards);
@@ -137,6 +142,10 @@ contract StakedToken is
         stakersLockEndTimestamp[msg.sender] = lockEndTimestamp;
 
         stakeEndTimestamps.push(lockEndTimestamp);
+
+        currentSupply = currentSupply.add(amount);
+
+        subSupplyAtTimestamp[lockEndTimestamp] = subSupplyAtTimestamp[lockEndTimestamp].add(amount);
 
         emit Staked(msg.sender, onBehalfOf, amount);
     }
@@ -272,7 +281,7 @@ contract StakedToken is
             user,
             address(this),
             userBalance,
-            totalSupply()
+            currentSupply
         );
         uint256 unclaimedRewards = stakerRewardsToClaim[user].add(
             accruedRewards
@@ -297,11 +306,10 @@ contract StakedToken is
         uint256 oldIndex = assetConfig.index;
         uint128 lastUpdateTimestamp = assetConfig.lastUpdateTimestamp;
 
-        for (uint256 i = 0; i < stakeEndTimestamps.length; i++) {
-            if (
-                stakeEndTimestamps[i] <= block.timestamp &&
-                indexAtTimestamp[stakeEndTimestamps[i]] == 0
-            ) {
+        uint256 i;
+        // update asset index with timestamp
+        for (i = timestampsStartIndex; i < stakeEndTimestamps.length; i++) {
+            if (stakeEndTimestamps[i] <= block.timestamp) {
                 indexAtTimestamp[
                     stakeEndTimestamps[i]
                 ] = _getAssetIndexWithTimestamp(
@@ -311,9 +319,21 @@ contract StakedToken is
                     totalStaked,
                     stakeEndTimestamps[i]
                 );
-                if (stakeEndTimestamps[i] > block.timestamp) break;
+            } else {
+                break;
             }
         }
+        timestampsStartIndex = i;
+
+        // update current supply
+        for (i = subSupplyStartIndex; i < stakeEndTimestamps.length; i++) {
+            if (stakeEndTimestamps[i] <= block.timestamp) {
+                currentSupply = currentSupply.sub(subSupplyAtTimestamp[stakeEndTimestamps[i]]);
+            } else {
+                break;
+            }
+        }
+        subSupplyStartIndex = i;
 
         if (block.timestamp == lastUpdateTimestamp) {
             return oldIndex;
@@ -469,7 +489,7 @@ contract StakedToken is
                 assetConfig.index,
                 assetConfig.emissionPerSecond,
                 assetConfig.lastUpdateTimestamp,
-                totalSupply(),
+                currentSupply,
                 block.timestamp <= stakersLockEndTimestamp[staker]
                     ? block.timestamp
                     : stakersLockEndTimestamp[staker]
