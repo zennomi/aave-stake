@@ -40,16 +40,16 @@ async function main() {
   console.log("stkAave deployed to:", stkToken.address);
 
   // tranfer some tokens for vault and user
-  await token.transfer(vault.address, 100000000);
-  await token.transfer(user1.address, 2000000);
-  await token.transfer(user2.address, 2000000);
-  await token.transfer(user3.address, 2000000);
+  await token.transfer(vault.address, 10000000000);
+  await token.transfer(user1.address, 200000000);
+  await token.transfer(user2.address, 200000000);
+  await token.transfer(user3.address, 200000000);
 
   // aprove for staked contract
-  await token.connect(vault).approve(stkToken.address, 10000000);
-  await token.connect(user1).approve(stkToken.address, 2000000);
-  await token.connect(user2).approve(stkToken.address, 2000000);
-  await token.connect(user3).approve(stkToken.address, 2000000);
+  await token.connect(vault).approve(stkToken.address, 1000000000);
+  await token.connect(user1).approve(stkToken.address, 200000000);
+  await token.connect(user2).approve(stkToken.address, 200000000);
+  await token.connect(user3).approve(stkToken.address, 200000000);
 
   // config
   await stkToken.configureAssets([
@@ -63,6 +63,9 @@ async function main() {
     "User1 staking end at ",
     (await stkToken.getUserLockEndTimestamp(user1.address)).toString()
   );
+  console.log("Current userCount ", (await stkToken.userCount()).toString());
+  console.log("Current emission/second ", (await stkToken.getAssetEmissionPerSecond()).toString());
+
   let user1Reward;
   let user2Reward;
 
@@ -88,6 +91,9 @@ async function main() {
   console.log("Reward of User 1: ", user1Reward.toString());
 
   await stkToken.connect(user2).stake(user2.address, 500000);
+  await stkToken.connect(user3).stake(user3.address, 500000);
+  console.log("Current userCount ", (await stkToken.userCount()).toString());
+  console.log("Current emission/second ", (await stkToken.getAssetEmissionPerSecond()).toString());
 
   await ethers.provider.send("evm_increaseTime", [7 * 24 * 3600]);
   await ethers.provider.send("evm_mine");
@@ -114,8 +120,6 @@ async function main() {
   console.log("Reward of User 1: ", user1Reward.toString());
   user2Reward = await stkToken.getTotalRewardsBalance(user2.address);
   console.log("Reward of User 2: ", user2Reward.toString());
-
-
   
   console.log("User 1 call cooldown()");
   await stkToken.connect(user1).cooldown();
