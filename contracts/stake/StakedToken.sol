@@ -310,10 +310,11 @@ contract StakedToken is
         returns (uint128)
     {
         // return 1;
-        uint256 A = 10000;
-        uint256 B = 1;
-        uint256 C = 5041;
-        uint256 D = 5;
+        // formula: y = (Ax)/(Bx^2+C) + D
+        uint256 A = 10000; // 1800000
+        uint256 B = 1; // 
+        uint256 C = 5000; // 1000000
+        uint256 D = 5; // 100
         uint256 numerator = userCount.mul(A);
         uint256 denominator = (B.mul(userCount).mul(userCount)).add(C);
         uint256 emissionPerSecond = (numerator.div(denominator)).add(D);
