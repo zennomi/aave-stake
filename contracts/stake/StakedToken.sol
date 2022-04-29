@@ -114,7 +114,7 @@ contract StakedToken is
         require(stakersLockEndTimestamp[msg.sender] == 0, "USER_STAKED");
 
         userCount = userCount.add(1);
-        
+
         uint256 accruedRewards = _updateUserAssetInternal(
             onBehalfOf,
             address(this),
@@ -152,7 +152,6 @@ contract StakedToken is
         subSupplyAtTimestamp[lockEndTimestamp] = subSupplyAtTimestamp[
             lockEndTimestamp
         ].add(amount);
-
 
         emit Staked(msg.sender, onBehalfOf, amount);
     }
@@ -310,18 +309,16 @@ contract StakedToken is
         pure
         returns (uint128)
     {
-        uint256 a;
-        uint256 b;
-        // for demo, 3 range: 0 -> 5 -> 10; 50 -> 100 -> 25
-        // y = 2x^2 + 50
-        a = 2;
-        b = 50;
-        if (userCount <= 5) return uint128(userCount.mul(userCount).mul(a).add(b));
-        // y = 125 - x^2
-        a = 1;
-        b = 125;
-        if (userCount <= 10) return uint128(b.sub((a.mul(userCount).mul(userCount))));
-        return 25;
+        // return 1;
+        uint256 A = 10000;
+        uint256 B = 1;
+        uint256 C = 5041;
+        uint256 D = 5;
+        uint256 numerator = userCount.mul(A);
+        uint256 denominator = (B.mul(userCount).mul(userCount)).add(C);
+        uint256 emissionPerSecond = (numerator.div(denominator)).add(D);
+
+        return uint128(emissionPerSecond);
     }
 
     function _updateAssetStateInternal(

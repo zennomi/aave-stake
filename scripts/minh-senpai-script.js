@@ -86,6 +86,8 @@ async function main() {
 
   await stkToken.connect(user2).claimRewards(user2.address, user2Reward);
 
+  // redeem
+
   console.log("User 1 call cooldown()");
   await stkToken.connect(user1).cooldown();
 
@@ -95,6 +97,16 @@ async function main() {
 
   await stkToken.connect(user1).redeem(user1.address, 500000);
   console.log("Balance of user 1: ", await token.balanceOf(user1.address));
+
+  console.log("User 2 call cooldown()");
+  await stkToken.connect(user2).cooldown();
+
+  await ethers.provider.send("evm_increaseTime", [3600]);
+  await ethers.provider.send("evm_mine");
+  console.log("Next 30s...");
+
+  await stkToken.connect(user2).redeem(user2.address, 500000);
+  console.log("Balance of user 2: ", await token.balanceOf(user2.address));
 }
 
 // We recommend this pattern to be able to use async/await everywhere
