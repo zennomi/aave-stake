@@ -365,7 +365,7 @@ contract StakedToken is
             oldIndex,
             assetConfig.emissionPerSecond,
             lastUpdateTimestamp,
-            totalStaked
+            currentSupply
         );
 
         if (newIndex != oldIndex) {
