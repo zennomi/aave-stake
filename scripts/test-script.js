@@ -63,84 +63,94 @@ async function main() {
     "User1 staking end at ",
     (await stkToken.getUserLockEndTimestamp(user1.address)).toString()
   );
+  
   console.log("Current userCount ", (await stkToken.userCount()).toString());
-  console.log("Current emission/second ", (await stkToken.getAssetEmissionPerSecond()).toString());
-
-  let user1Reward;
-  let user2Reward;
+  console.log(
+    "Current emission/second ",
+    (await stkToken.getAssetEmissionPerSecond()).toString()
+    );
+    
+    let user1Reward;
+    let user2Reward;
+  let user3Reward;
 
   await ethers.provider.send("evm_increaseTime", [5 * 24 * 3600]);
   await ethers.provider.send("evm_mine");
-  console.log("Next 5 days... Current timestamp is ", (await ethers.provider.getBlock((await ethers.provider.getBlockNumber()))).timestamp);
+  console.log(
+    "Next 5 days... Current timestamp is ",
+    (await ethers.provider.getBlock(await ethers.provider.getBlockNumber()))
+      .timestamp
+  );
 
   user1Reward = await stkToken.getTotalRewardsBalance(user1.address);
   console.log("Reward of User 1: ", user1Reward.toString());
 
-  await ethers.provider.send("evm_increaseTime", [1 * 24 * 3600]);
+  await ethers.provider.send("evm_increaseTime", [3 * 24 * 3600]);
   await ethers.provider.send("evm_mine");
-  console.log("Next 1 day... Current timestamp is ", (await ethers.provider.getBlock((await ethers.provider.getBlockNumber()))).timestamp);
+  console.log(
+    "Next 3 day... Current timestamp is ",
+    (await ethers.provider.getBlock(await ethers.provider.getBlockNumber()))
+      .timestamp
+  );
 
   user1Reward = await stkToken.getTotalRewardsBalance(user1.address);
   console.log("Reward of User 1: ", user1Reward.toString());
-
-  await ethers.provider.send("evm_increaseTime", [2 * 24 * 3600]);
-  await ethers.provider.send("evm_mine");
-  console.log("Next 1 day... Current timestamp is ", (await ethers.provider.getBlock((await ethers.provider.getBlockNumber()))).timestamp);
-
-  user1Reward = await stkToken.getTotalRewardsBalance(user1.address);
-  console.log("Reward of User 1: ", user1Reward.toString());
-
+  
   await stkToken.connect(user2).stake(user2.address, 500000);
   await stkToken.connect(user3).stake(user3.address, 500000);
-  console.log("Current userCount ", (await stkToken.userCount()).toString());
-  console.log("Current emission/second ", (await stkToken.getAssetEmissionPerSecond()).toString());
 
-  await ethers.provider.send("evm_increaseTime", [7 * 24 * 3600]);
+  console.log(
+    "User2 staking end at ",
+    (await stkToken.getUserLockEndTimestamp(user2.address)).toString()
+  );
+  console.log(
+    "User3 staking end at ",
+    (await stkToken.getUserLockEndTimestamp(user3.address)).toString()
+  );
+
+  console.log(
+    "Current emission/second ",
+    (await stkToken.getAssetEmissionPerSecond()).toString()
+  );
+
+  await ethers.provider.send("evm_increaseTime", [4 * 24 * 3600]);
   await ethers.provider.send("evm_mine");
-  console.log("Next 5 days... Current timestamp is ", (await ethers.provider.getBlock((await ethers.provider.getBlockNumber()))).timestamp);
 
-  user1Reward = await stkToken.getTotalRewardsBalance(user1.address);
-  console.log("Reward of User 1: ", user1Reward.toString());
-  user2Reward = await stkToken.getTotalRewardsBalance(user2.address);
-  console.log("Reward of User 2: ", user2Reward.toString());
+  await stkToken.connect(user2).cooldown();
 
   await ethers.provider.send("evm_increaseTime", [1 * 24 * 3600]);
   await ethers.provider.send("evm_mine");
-  console.log("Next 5 days... Current timestamp is ", (await ethers.provider.getBlock((await ethers.provider.getBlockNumber()))).timestamp);
-
-  user1Reward = await stkToken.getTotalRewardsBalance(user1.address);
-  console.log("Reward of User 1: ", user1Reward.toString());
+  console.log(
+    "Next 5 days... Current timestamp is ",
+    (await ethers.provider.getBlock(await ethers.provider.getBlockNumber()))
+      .timestamp
+  );
 
   user2Reward = await stkToken.getTotalRewardsBalance(user2.address);
   console.log("Reward of User 2: ", user2Reward.toString());
-  await stkToken.connect(user1).claimRewards(user1.address, user1Reward);
-  await stkToken.connect(user2).claimRewards(user2.address, user2Reward);
-
-  user1Reward = await stkToken.getTotalRewardsBalance(user1.address);
-  console.log("Reward of User 1: ", user1Reward.toString());
-  user2Reward = await stkToken.getTotalRewardsBalance(user2.address);
-  console.log("Reward of User 2: ", user2Reward.toString());
-  
-  console.log("User 1 call cooldown()");
-  await stkToken.connect(user1).cooldown();
-
-  await ethers.provider.send("evm_increaseTime", [3600]);
-  await ethers.provider.send("evm_mine");
-  console.log("Next 30s...");
-
-  await stkToken.connect(user1).redeem(user1.address, 500000);
-  console.log("Balance of user 1: ", await token.balanceOf(user1.address));
-
-  console.log("User 2 call cooldown()");
-  await stkToken.connect(user2).cooldown();
-
-  await ethers.provider.send("evm_increaseTime", [3600]);
-  await ethers.provider.send("evm_mine");
-  console.log("Next 30s...");
+  user3Reward = await stkToken.getTotalRewardsBalance(user3.address);
+  console.log("Reward of User 3: ", user3Reward.toString());
 
   await stkToken.connect(user2).redeem(user2.address, 500000);
-  console.log("Balance of user 2: ", await token.balanceOf(user2.address));
-  
+  // await stkToken.connect(user2).claimRewards(user2.address, user2Reward);
+  console.log(
+    "Current emission/second ",
+    (await stkToken.getAssetEmissionPerSecond()).toString()
+  );
+
+  await ethers.provider.send("evm_increaseTime", [3 * 24 * 3600]);
+  await ethers.provider.send("evm_mine");
+  console.log(
+    "Next 3 day... Current timestamp is ",
+    (await ethers.provider.getBlock(await ethers.provider.getBlockNumber()))
+      .timestamp
+  );
+
+  user2Reward = await stkToken.getTotalRewardsBalance(user2.address);
+  console.log("Reward of User 2: ", user2Reward.toString());
+  user3Reward = await stkToken.getTotalRewardsBalance(user3.address);
+  console.log("Reward of User 3: ", user3Reward.toString());
+  await stkToken.connect(user3).claimRewards(user3.address, user3Reward);
 }
 
 // We recommend this pattern to be able to use async/await everywhere
