@@ -45,6 +45,7 @@ contract StakedToken is
     mapping(address => uint256) public stakersLockEndTimestamp;
     mapping(uint256 => uint256) public indexAtTimestamp;
     mapping(uint256 => uint256) public subSupplyAtTimestamp;
+    mapping(uint256 => uint256) public subUserCountAtTimestamp;
 
     uint256 public userCount;
 
@@ -111,9 +112,26 @@ contract StakedToken is
     function stake(address onBehalfOf, uint256 amount) external override {
         require(amount != 0, "INVALID_ZERO_AMOUNT");
         uint256 balanceOfUser = balanceOf(onBehalfOf);
-        require(stakersLockEndTimestamp[msg.sender] == 0, "USER_STAKED");
+        require(balanceOf(msg.sender) == 0, "USER_STAKED");
 
+        uint256 lockEndTimestamp = block.timestamp.add(LOCK_SECONDS);
+
+        stakersLockEndTimestamp[msg.sender] = lockEndTimestamp;
+
+        stakeEndTimestamps.push(lockEndTimestamp);
+
+        currentSupply = currentSupply.add(amount);
         userCount = userCount.add(1);
+        assets[address(this)].emissionPerSecond = _getEmissionPerSecond(
+            userCount
+        );
+
+        subSupplyAtTimestamp[lockEndTimestamp] = subSupplyAtTimestamp[
+            lockEndTimestamp
+        ].add(amount);
+        subUserCountAtTimestamp[lockEndTimestamp] = subUserCountAtTimestamp[
+            lockEndTimestamp
+        ].add(1);
 
         uint256 accruedRewards = _updateUserAssetInternal(
             onBehalfOf,
@@ -140,18 +158,6 @@ contract StakedToken is
             address(this),
             amount
         );
-
-        uint256 lockEndTimestamp = block.timestamp.add(LOCK_SECONDS);
-
-        stakersLockEndTimestamp[msg.sender] = lockEndTimestamp;
-
-        stakeEndTimestamps.push(lockEndTimestamp);
-
-        currentSupply = currentSupply.add(amount);
-
-        subSupplyAtTimestamp[lockEndTimestamp] = subSupplyAtTimestamp[
-            lockEndTimestamp
-        ].add(amount);
 
         emit Staked(msg.sender, onBehalfOf, amount);
     }
@@ -188,13 +194,26 @@ contract StakedToken is
 
         _burn(msg.sender, amountToRedeem);
 
+        uint256 lockEndTimestamp = stakersLockEndTimestamp[msg.sender];
+
         if (balanceOfMessageSender.sub(amountToRedeem) == 0) {
             stakersCooldowns[msg.sender] = 0;
+            userCount = userCount.sub(1);
+            assets[address(this)].emissionPerSecond = _getEmissionPerSecond(
+            userCount
+        );
+            subUserCountAtTimestamp[lockEndTimestamp] = subUserCountAtTimestamp[
+                lockEndTimestamp
+            ].sub(1);
         }
 
-        IERC20(STAKED_TOKEN).safeTransfer(to, amountToRedeem);
+        // delete lockEndTimestamp;
+        currentSupply = currentSupply.sub(amount);
+        subSupplyAtTimestamp[lockEndTimestamp] = subSupplyAtTimestamp[
+            lockEndTimestamp
+        ].sub(amount);
 
-        delete stakersLockEndTimestamp[msg.sender];
+        IERC20(STAKED_TOKEN).safeTransfer(to, amountToRedeem);
 
         emit Redeem(msg.sender, to, amountToRedeem);
     }
@@ -312,7 +331,7 @@ contract StakedToken is
         // return 1;
         // formula: y = (Ax)/(Bx^2+C) + D
         uint256 A = 10000; // 1800000
-        uint256 B = 1; // 
+        uint256 B = 1; //
         uint256 C = 5000; // 1000000
         uint256 D = 5; // 100
         uint256 numerator = userCount.mul(A);
@@ -334,33 +353,30 @@ contract StakedToken is
             return oldIndex;
         }
 
-        // update emission/second
-        assetConfig.emissionPerSecond = _getEmissionPerSecond(userCount);
-
         // update asset index, usercount, current supply with timestamp
         uint256 i;
         for (i = timestampsStartIndex; i < stakeEndTimestamps.length; i++) {
-            if (stakeEndTimestamps[i] <= block.timestamp) {
-                indexAtTimestamp[
-                    stakeEndTimestamps[i]
-                ] = _getAssetIndexWithTimestamp(
+            uint256 timestamp = stakeEndTimestamps[i];
+            if (timestamp <= block.timestamp) {
+                indexAtTimestamp[timestamp] = _getAssetIndexWithTimestamp(
                     oldIndex,
                     assetConfig.emissionPerSecond,
                     lastUpdateTimestamp,
                     totalStaked,
-                    stakeEndTimestamps[i]
+                    timestamp
                 );
 
-                userCount = userCount.sub(1);
+                userCount = userCount.sub(subUserCountAtTimestamp[timestamp]);
+                assetConfig.emissionPerSecond = _getEmissionPerSecond(userCount);
                 currentSupply = currentSupply.sub(
-                    subSupplyAtTimestamp[stakeEndTimestamps[i]]
+                    subSupplyAtTimestamp[timestamp]
                 );
             } else {
                 break;
             }
         }
         timestampsStartIndex = i;
-
+        
         uint256 newIndex = _getAssetIndex(
             oldIndex,
             assetConfig.emissionPerSecond,
