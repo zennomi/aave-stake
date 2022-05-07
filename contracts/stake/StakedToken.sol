@@ -12,6 +12,7 @@ import {VersionedInitializable} from "../utils/VersionedInitializable.sol";
 import {DistributionTypes} from "../lib/DistributionTypes.sol";
 import {AaveDistributionManager} from "./AaveDistributionManager.sol";
 import {SafeMath} from "../lib/SafeMath.sol";
+import {UniV2Math} from "../lib/UniV2Math.sol";
 
 /**
  * @title StakedToken
@@ -25,7 +26,14 @@ contract StakedToken is
     AaveDistributionManager
 {
     using SafeMath for uint256;
+    using UniV2Math for uint256;
     using SafeERC20 for IERC20;
+
+    uint256 private _X;
+    uint256 private _Y;
+    uint256 private _Z;
+    uint256 private _m;
+    // graph for this formula: https://www.desmos.com/calculator/f3fjx7oqld
 
     uint256 public constant REVISION = 1;
 
@@ -109,6 +117,30 @@ contract StakedToken is
         _setAaveGovernance(aaveGovernance);
     }
 
+    function _updateEmissionPerSecond() private {
+        assets[address(this)].emissionPerSecond = _getEmissionPerSecond(
+            _X,
+            _Y,
+            _Z,
+            _m,
+            userCount
+        );
+    }
+
+    function configureEmissionPerSecond(
+        uint256 X,
+        uint256 Y,
+        uint256 Z,
+        uint256 m
+    ) external {
+        require(msg.sender == EMISSION_MANAGER, "ONLY_EMISSION_MANAGER");
+        _X = X;
+        _Y = Y;
+        _Z = Z;
+        _m = m;
+        _updateEmissionPerSecond();
+    }
+
     function stake(address onBehalfOf, uint256 amount) external override {
         require(amount != 0, "INVALID_ZERO_AMOUNT");
         uint256 balanceOfUser = balanceOf(onBehalfOf);
@@ -122,9 +154,7 @@ contract StakedToken is
 
         currentSupply = currentSupply.add(amount);
         userCount = userCount.add(1);
-        assets[address(this)].emissionPerSecond = _getEmissionPerSecond(
-            userCount
-        );
+        _updateEmissionPerSecond();
 
         subSupplyAtTimestamp[lockEndTimestamp] = subSupplyAtTimestamp[
             lockEndTimestamp
@@ -199,9 +229,7 @@ contract StakedToken is
         if (balanceOfMessageSender.sub(amountToRedeem) == 0) {
             stakersCooldowns[msg.sender] = 0;
             userCount = userCount.sub(1);
-            assets[address(this)].emissionPerSecond = _getEmissionPerSecond(
-            userCount
-        );
+            _updateEmissionPerSecond();
             subUserCountAtTimestamp[lockEndTimestamp] = subUserCountAtTimestamp[
                 lockEndTimestamp
             ].sub(1);
@@ -322,25 +350,94 @@ contract StakedToken is
         return unclaimedRewards;
     }
 
-    // rewrite some functions
-    function _getEmissionPerSecond(uint256 userCount)
-        internal
-        pure
-        returns (uint128)
-    {
-        // return 1;
-        // formula: y = (Ax)/(Bx^2+C) + D
-        uint256 A = 10000; // 1800000
-        uint256 B = 1; //
-        uint256 C = 5000; // 1000000
-        uint256 D = 5; // 100
-        uint256 numerator = userCount.mul(A);
-        uint256 denominator = (B.mul(userCount).mul(userCount)).add(C);
-        uint256 emissionPerSecond = (numerator.div(denominator)).add(D);
+    // formula for emission/s
+    function _getCoefficientU(
+        uint256 X,
+        uint256 Y,
+        uint256 Z
+    ) public pure returns (uint256) {
+        uint256 k = ((Y.sub(Z)).mul(10**9)).div((Z.sub(X)));
 
-        return uint128(emissionPerSecond);
+        return k.sub(((k.mul(k)).sub(10**18)).sqrt());
     }
 
+    function _getCoefficientC(
+        uint256 X,
+        uint256 Y,
+        uint256 Z,
+        uint256 m
+    ) public pure returns (uint256) {
+        uint256 numerator = (m.mul(10**9)).sub(10 * 9);
+        uint256 u = _getCoefficientU(X, Y, Z);
+        uint256 denominator = u.add(10**9);
+
+        return (numerator.div(denominator)).mul((numerator.div(denominator)));
+    }
+
+    function _getCoefficientB(
+        uint256 X,
+        uint256 Y,
+        uint256 Z,
+        uint256 m
+    ) public pure returns (uint256) {
+        uint256 u = _getCoefficientU(X, Y, Z);
+
+        return ((m.sub(1)).mul(u)).div(u.add(10**9));
+    }
+
+    function _getCoefficientA(
+        uint256 X,
+        uint256 Y,
+        uint256 Z,
+        uint256 m
+    ) public pure returns (uint256) {
+        uint256 u = _getCoefficientU(X, Y, Z);
+        uint256 numerator = (Y.sub(Z)).mul(2).mul(m.sub(1)).mul(10**9);
+        uint256 denominator = u.add(10**9);
+
+        return (numerator.div(denominator));
+    }
+
+    function _getEmissionPerSecond(
+        uint256 X,
+        uint256 Y,
+        uint256 Z,
+        uint256 m,
+        uint256 userCount
+    ) public pure returns (uint128) {
+        //define u
+        uint256 u = _getCoefficientU(X, Y, Z);
+
+        //define a
+        uint256 a = _getCoefficientA(X, Y, Z, m);
+
+        //define b
+        uint256 b = _getCoefficientB(X, Y, Z, m);
+
+        //define c
+        uint256 c = _getCoefficientC(X, Y, Z, m);
+
+        uint256 numerator;
+        if (userCount > b.add(1)) {
+            numerator = a.mul((userCount).sub(b).sub(1));
+        } else {
+            a.mul((b.add(1)).sub(userCount));
+        }
+        uint256 denominator;
+        if (userCount > b.add(1)) {
+            denominator = (((userCount).sub(b).sub(1))**2).add(c);
+        } else {
+            denominator = (((b.add(1)).sub(userCount))**2).add(c);
+        }
+
+        // //emmission per second
+        // //uint128((numerator.div(denominator)).add(Z.mul(10**9)))
+
+        // console.log(  (numerator.div(denominator)).add(Z.mul(10**9)) );
+        return uint128((numerator.div(denominator)).add(Z));
+    }
+
+    // updated function
     function _updateAssetStateInternal(
         address underlyingAsset,
         AssetData storage assetConfig,
@@ -367,7 +464,7 @@ contract StakedToken is
                 );
 
                 userCount = userCount.sub(subUserCountAtTimestamp[timestamp]);
-                assetConfig.emissionPerSecond = _getEmissionPerSecond(userCount);
+                _updateEmissionPerSecond();
                 currentSupply = currentSupply.sub(
                     subSupplyAtTimestamp[timestamp]
                 );
@@ -376,7 +473,7 @@ contract StakedToken is
             }
         }
         timestampsStartIndex = i;
-        
+
         uint256 newIndex = _getAssetIndex(
             oldIndex,
             assetConfig.emissionPerSecond,

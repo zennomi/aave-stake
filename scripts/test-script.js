@@ -55,6 +55,7 @@ async function main() {
   await stkToken.configureAssets([
     { emissionPerSecond: 1, totalStaked: 0, underlyingAsset: stkToken.address },
   ]);
+  await stkToken.configureEmissionPerSecond(6, 100, 10, 90);
 
   // start staking
   await stkToken.connect(user1).stake(user1.address, 500000);
@@ -63,15 +64,15 @@ async function main() {
     "User1 staking end at ",
     (await stkToken.getUserLockEndTimestamp(user1.address)).toString()
   );
-  
+
   console.log("Current userCount ", (await stkToken.userCount()).toString());
   console.log(
     "Current emission/second ",
     (await stkToken.getAssetEmissionPerSecond()).toString()
-    );
-    
-    let user1Reward;
-    let user2Reward;
+  );
+
+  let user1Reward;
+  let user2Reward;
   let user3Reward;
 
   await ethers.provider.send("evm_increaseTime", [5 * 24 * 3600]);
@@ -95,7 +96,7 @@ async function main() {
 
   user1Reward = await stkToken.getTotalRewardsBalance(user1.address);
   console.log("Reward of User 1: ", user1Reward.toString());
-  
+
   await stkToken.connect(user2).stake(user2.address, 500000);
   await stkToken.connect(user3).stake(user3.address, 500000);
 

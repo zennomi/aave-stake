@@ -27,7 +27,7 @@ async function main() {
     token.address,
     token.address,
     10,
-    24 * 3600,
+    2 * 24 * 3600,
     vault.address,
     owner.address,
     365 * 24 * 60 * 60
